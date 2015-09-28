@@ -134,6 +134,10 @@ typedef void(^SDWebImageCalculateSizeBlock)(NSUInteger fileCount, NSUInteger tot
  */
 - (void)storeImage:(UIImage *)image recalculateFromImage:(BOOL)recalculate imageData:(NSData *)imageData forKey:(NSString *)key toDisk:(BOOL)toDisk;
 
+- (void)storeImage:(UIImage *)image recalculateFromImage:(BOOL)recalculate imageData:(NSData *)imageData forKey:(NSString *)key toDisk:(BOOL)toDisk done:(void (^)())doneBlock;
+
+- (void)storeImage:(UIImage *)image forKey:(NSString *)key toDisk:(BOOL)toDisk done:(void (^)())doneBlock;
+
 /**
  * Query the disk cache asynchronously.
  *

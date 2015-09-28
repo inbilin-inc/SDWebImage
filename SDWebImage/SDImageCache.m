@@ -195,7 +195,7 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
     return [paths[0] stringByAppendingPathComponent:fullNamespace];
 }
 
-- (void)storeImage:(UIImage *)image recalculateFromImage:(BOOL)recalculate imageData:(NSData *)imageData forKey:(NSString *)key toDisk:(BOOL)toDisk {
+- (void)storeImage:(UIImage *)image recalculateFromImage:(BOOL)recalculate imageData:(NSData *)imageData forKey:(NSString *)key toDisk:(BOOL)toDisk done:(void (^)())doneBlock {
     if (!image || !key) {
         return;
     }
@@ -204,18 +204,18 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
         NSUInteger cost = SDCacheCostForImage(image);
         [self.memCache setObject:image forKey:key cost:cost];
     }
-
+    
     if (toDisk) {
         dispatch_async(self.ioQueue, ^{
             NSData *data = imageData;
-
+            
             if (image && (recalculate || !data)) {
 #if TARGET_OS_IPHONE
                 // We need to determine if the image is a PNG or a JPEG
                 // PNGs are easier to detect because they have a unique signature (http://www.w3.org/TR/PNG-Structure.html)
                 // The first eight bytes of a PNG file always contain the following (decimal) values:
                 // 137 80 78 71 13 10 26 10
-
+                
                 // If the imageData is nil (i.e. if trying to save a UIImage directly or the image was transformed on download)
                 // and the image has an alpha channel, we will consider it PNG to avoid losing the transparency
                 int alphaInfo = CGImageGetAlphaInfo(image.CGImage);
@@ -223,12 +223,12 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
                                   alphaInfo == kCGImageAlphaNoneSkipFirst ||
                                   alphaInfo == kCGImageAlphaNoneSkipLast);
                 BOOL imageIsPng = hasAlpha;
-
+                
                 // But if we have an image data, we will look at the preffix
                 if ([imageData length] >= [kPNGSignatureData length]) {
                     imageIsPng = ImageDataHasPNGPreffix(imageData);
                 }
-
+                
                 if (imageIsPng) {
                     data = UIImagePNGRepresentation(image);
                 }
@@ -239,26 +239,37 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
                 data = [NSBitmapImageRep representationOfImageRepsInArray:image.representations usingType: NSJPEGFileType properties:nil];
 #endif
             }
-
+            
             if (data) {
                 if (![_fileManager fileExistsAtPath:_diskCachePath]) {
                     [_fileManager createDirectoryAtPath:_diskCachePath withIntermediateDirectories:YES attributes:nil error:NULL];
                 }
-
+                
                 // get cache Path for image key
                 NSString *cachePathForKey = [self defaultCachePathForKey:key];
                 // transform to NSUrl
                 NSURL *fileURL = [NSURL fileURLWithPath:cachePathForKey];
-
+                
                 [_fileManager createFileAtPath:cachePathForKey contents:data attributes:nil];
-
+                
                 // disable iCloud backup
                 if (self.shouldDisableiCloud) {
                     [fileURL setResourceValue:[NSNumber numberWithBool:YES] forKey:NSURLIsExcludedFromBackupKey error:nil];
                 }
             }
+            
+            if (doneBlock) {
+                dispatch_main_sync_safe(^
+                                        {
+                                            doneBlock();
+                                        });
+            }
         });
     }
+}
+
+- (void)storeImage:(UIImage *)image recalculateFromImage:(BOOL)recalculate imageData:(NSData *)imageData forKey:(NSString *)key toDisk:(BOOL)toDisk {
+    [self storeImage:image recalculateFromImage:recalculate imageData:imageData forKey:key toDisk:toDisk done:nil];
 }
 
 - (void)storeImage:(UIImage *)image forKey:(NSString *)key {
@@ -267,6 +278,10 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
 
 - (void)storeImage:(UIImage *)image forKey:(NSString *)key toDisk:(BOOL)toDisk {
     [self storeImage:image recalculateFromImage:YES imageData:nil forKey:key toDisk:toDisk];
+}
+
+- (void)storeImage:(UIImage *)image forKey:(NSString *)key toDisk:(BOOL)toDisk done:(void (^)())doneBlock {
+    [self storeImage:image recalculateFromImage:YES imageData:nil forKey:key toDisk:toDisk done:doneBlock];
 }
 
 - (BOOL)diskImageExistsWithKey:(NSString *)key {
