@@ -211,3 +211,9 @@
 - (void)cancelCurrentImageLoad __deprecated_msg("Use `sd_cancelCurrentImageLoad`");
 
 @end
+
+@interface NSURL (ReloadImage)
+
+@property (nonatomic, assign) NSInteger reloadTimes;
+
+@end

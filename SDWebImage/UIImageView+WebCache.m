@@ -10,6 +10,22 @@
 #import "objc/runtime.h"
 #import "UIView+WebCacheOperation.h"
 
+static void * const kURLReloadTimeKey = "reloadTimes";
+
+@implementation NSURL (ReloadImage)
+
+- (void)setReloadTimes:(NSInteger)reloadTimes
+{
+    objc_setAssociatedObject(self, kURLReloadTimeKey, @(reloadTimes), OBJC_ASSOCIATION_ASSIGN);
+}
+
+- (NSInteger)reloadTimes
+{
+    return [objc_getAssociatedObject(self, kURLReloadTimeKey) integerValue];
+}
+
+@end
+
 static char imageURLKey;
 static char TAG_ACTIVITY_INDICATOR;
 static char TAG_ACTIVITY_STYLE;
@@ -38,7 +54,29 @@ static char TAG_ACTIVITY_SHOW;
 }
 
 - (void)sd_setImageWithURL:(NSURL *)url placeholderImage:(UIImage *)placeholder options:(SDWebImageOptions)options completed:(SDWebImageCompletionBlock)completedBlock {
-    [self sd_setImageWithURL:url placeholderImage:placeholder options:options progress:nil completed:completedBlock];
+    [self sd_setImageWithURL:url placeholderImage:placeholder options:options completed:nil retryTimes:3];
+}
+
+- (void)sd_setImageWithURL:(NSURL *)url placeholderImage:(UIImage *)placeholder options:(SDWebImageOptions)options completed:(SDWebImageCompletionBlock)completedBlock retryTimes:(NSInteger)retryTimes
+{
+    [self sd_setImageWithURL:url placeholderImage:placeholder options:options progress:nil completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, NSURL *imageURL) {
+        if (error && url) {
+            NSInteger times = url.reloadTimes;
+            if (times < retryTimes) {
+                times++;
+                url.reloadTimes = times;
+                [self sd_setImageWithURL:url placeholderImage:placeholder options:options completed:completedBlock retryTimes:retryTimes];
+            } else {
+                if (completedBlock) {
+                    completedBlock(image, error, cacheType, imageURL);
+                }
+            }
+        } else {
+            if (completedBlock) {
+                completedBlock(image, error, cacheType, imageURL);
+            }
+        }
+    }];
 }
 
 - (void)sd_setImageWithURL:(NSURL *)url placeholderImage:(UIImage *)placeholder options:(SDWebImageOptions)options progress:(SDWebImageDownloaderProgressBlock)progressBlock completed:(SDWebImageCompletionBlock)completedBlock {
