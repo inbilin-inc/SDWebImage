@@ -219,6 +219,8 @@ SDWebImageManager *manager = [SDWebImageManager sharedManager];
 
 - (void)saveImageToCache:(UIImage *)image forURL:(NSURL *)url;
 
+- (void)saveImageToCache:(UIImage *)image forURL:(NSURL *)url done:(void (^)())doneBlock;
+
 /**
  * Cancel all current operations
  */

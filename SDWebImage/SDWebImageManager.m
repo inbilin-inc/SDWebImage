@@ -288,6 +288,13 @@
     }
 }
 
+- (void)saveImageToCache:(UIImage *)image forURL:(NSURL *)url done:(void (^)())doneBlock {
+    if (image && url) {
+        NSString *key = [self cacheKeyForURL:url];
+        [self.imageCache storeImage:image forKey:key toDisk:YES done:doneBlock];
+    }
+}
+
 - (void)cancelAll {
     @synchronized (self.runningOperations) {
         NSArray *copiedOperations = [self.runningOperations copy];
